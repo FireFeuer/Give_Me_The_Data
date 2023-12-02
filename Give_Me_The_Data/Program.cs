@@ -22,7 +22,7 @@ string data = $"Операционная система: {os}nСвободное
 
 //TcpClient client = new TcpClient("IP_адрес_сервера", "порт_сервера"); // подключаемся к серверу и создаём клиента 
 
-// Здесь данные должны отправляться на сервер 
+//// Здесь данные должны отправляться на сервер 
 
 //StreamWriter writer = new StreamWriter(client.GetStream());
 //writer.WriteLine(data);
