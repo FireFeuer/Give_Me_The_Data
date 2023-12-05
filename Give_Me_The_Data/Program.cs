@@ -25,12 +25,28 @@ while (true)
     };
 
     // Десиарилизируем полученную строку в словарь 
-    Dictionary<string, string> aboba = JsonSerializer.Deserialize<Dictionary<string, string>>(data, options);
+    Dictionary<string, string> dict = JsonSerializer.Deserialize<Dictionary<string, string>>(data, options);
 
     client.Close();
 
     // Сохраняем данные в текстовый файл
-    string fileName = $"{aboba["name"]} инфо - {DateTime.Now.ToString("dd.MM.yyyy HH.mm")}.txt";
-    File.WriteAllText(fileName, data);
+    string fileName = $"{dict["name"]} инфо - {DateTime.Now.ToString("dd.MM.yyyy HH.mm")}.txt";
+
+    string folderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+    folderPath = Path.Combine(folderPath, "PCInfo");
+    folderPath = Path.Combine(folderPath, dict["name"]);
+    string fullpath = Path.Combine(folderPath, fileName);
+
+    DirectoryInfo dirInfo = new DirectoryInfo(folderPath);
+
+    if (!dirInfo.Exists)
+    {
+        dirInfo.Create();
+    }
+
+
+
+
+    File.WriteAllText(fullpath, data);
     Console.WriteLine(data);
 }
