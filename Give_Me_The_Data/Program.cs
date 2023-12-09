@@ -1,52 +1,126 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Unicode;
 
-IPAddress ipAddress = IPAddress.Parse("26.194.255.228");
-int port = 3333;
-TcpListener server = new TcpListener(ipAddress, port);
-server.Start();
 
-while (true)
+// код конфигурационного файла config.env
+partial class Program
 {
-    TcpClient client = server.AcceptTcpClient(); // Принимаем подключение от клиента
 
-    // Читаем данные от клиента
-    StreamReader reader = new StreamReader(client.GetStream());
-    string data = reader.ReadToEnd();
-    Console.WriteLine();
-
-    // Создаем настройки для десириализации
-    var options = new JsonSerializerOptions
+    static async Task Main(string[] args)
     {
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(UnicodeRanges.All),
-        WriteIndented = true
-    };
+        string path = Directory.GetCurrentDirectory();
+        string pathToEnvFile = path.Substring(0, path.IndexOf("bin"));
+        pathToEnvFile = pathToEnvFile + "config.env";
 
-    // Десиарилизируем полученную строку в словарь 
-    Dictionary<string, string> dict = JsonSerializer.Deserialize<Dictionary<string, string>>(data, options);
+        string ip = "";
+        int port = 0;
 
-    client.Close();
+        using (var streamReader = new StreamReader(pathToEnvFile))
+        {
+            string fileContents = await streamReader.ReadToEndAsync();
+            string[] lines = fileContents.Split('\n');
 
-    // Сохраняем данные в текстовый файл
-    string fileName = $"{dict["name"]} инфо - {DateTime.Now.ToString("dd.MM.yyyy HH.mm")}.txt";
+            foreach (string line in lines)
+            {
+                string[] keyValue = line.Split('=');
+                if (keyValue.Length == 2)
+                {
+                    string key_env = keyValue[0].Trim();
+                    string value = keyValue[1].Trim();
 
-    string folderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-    folderPath = Path.Combine(folderPath, "PCInfo");
-    folderPath = Path.Combine(folderPath, dict["name"]);
-    string fullpath = Path.Combine(folderPath, fileName);
+                    switch (key_env)
+                    {
+                        case "IP":
+                            ip = value;
+                            break;
+                        case "PORT":
+                            port = int.Parse(value);
+                            break;
+                    }
+                }
+            }
+        }
 
-    DirectoryInfo dirInfo = new DirectoryInfo(folderPath);
+        IPAddress ipAddress = IPAddress.Parse(ip);
+        TcpListener server = new TcpListener(ipAddress, port);
+        server.Start();
 
-    if (!dirInfo.Exists)
-    {
-        dirInfo.Create();
+        Console.WriteLine($"" +
+            $"Сервер запущен\n" +
+            $"Ip - {ip}\n" +
+            $"Порт - {port}");
+
+        while (true)
+        {
+            TcpClient client = await server.AcceptTcpClientAsync(); // Принимаем подключение от клиента
+
+            // Читаем данные от клиента
+            StreamReader reader = new StreamReader(client.GetStream());
+            string data = "";
+            data = data.Trim();
+            try
+            {
+                data = await reader.ReadToEndAsync();
+            }
+            catch
+            {
+                Console.WriteLine("Поизощла ошибка на стороне отправителя");
+            }
+
+
+
+
+
+            // Создаем настройки для десириализации
+            var options = new JsonSerializerOptions
+            {
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(UnicodeRanges.All),
+                WriteIndented = true
+            };
+
+
+            data = data.Remove(data.LastIndexOf(","), 1);
+            Console.WriteLine(data);
+
+
+            byte[] byteArray = Encoding.UTF8.GetBytes(data);
+            MemoryStream stream = new MemoryStream(byteArray);
+
+            // Десиарилизируем полученную строку в словарь 
+            List<Dictionary<string, string>> dictitionariesList = await JsonSerializer.DeserializeAsync<List<Dictionary<string, string>>>(stream, options);
+            client.Close();
+
+
+            foreach (Dictionary<string, string> dict in dictitionariesList)
+            {
+                // Сохраняем данные в текстовый файл
+                string fileName = $"{dict["name"]} инфо - {dict["time"]}.txt";
+
+                string folderPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                folderPath = Path.Combine(folderPath, "PCInfo");
+                folderPath = Path.Combine(folderPath, dict["name"]);
+                string fullpath = Path.Combine(folderPath, fileName);
+
+                DirectoryInfo dirInfo = new DirectoryInfo(folderPath);
+
+                if (!dirInfo.Exists)
+                {
+                    dirInfo.Create();
+                }
+
+
+                await File.WriteAllTextAsync(fullpath, data);
+
+                string fullInfo = $"{dict["name"]}\n{dict["driveInfo"]}";
+                Console.WriteLine(fullInfo);
+            }
+
+        }
     }
-
-
-
-
-    File.WriteAllText(fullpath, data);
-    Console.WriteLine(data);
 }
+
+
+
