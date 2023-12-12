@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Unicode;
@@ -14,7 +15,6 @@ partial class Program
     {
         string path = Directory.GetCurrentDirectory();
 
-        Console.WriteLine(path);
         string pathToEnvFile = Path.Combine(path, "config.env");
         string ip = "";
         int port = 0;
@@ -22,7 +22,7 @@ partial class Program
 
         if (!File.Exists(pathToEnvFile))
         {
-            await File.WriteAllTextAsync(pathToEnvFile, $"IP={GetLocalIPAddress()}\r\nPORT=3333");
+            await File.WriteAllTextAsync(pathToEnvFile, $"IP={GetLocalIPAddress()}\r\nPORT=3333\nAUTOLOAD=TRUE");
         }
         using (var streamReader = new StreamReader(pathToEnvFile))
         {
@@ -32,7 +32,7 @@ partial class Program
             foreach (string line in lines)
             {
                 string[] keyValue = line.Split('=');
-                if (keyValue.Length == 2)
+                if (keyValue.Length == 3 || keyValue.Length == 2)
                 {
                     string key_env = keyValue[0].Trim();
                     string value = keyValue[1].Trim();
@@ -43,7 +43,16 @@ partial class Program
                             ip = value;
                             break;
                         case "PORT":
-                            port = int.Parse(value);
+                            try
+                            {
+                                port = int.Parse(value);
+                            }
+                            catch
+                            {
+                                Console.WriteLine($"Используемый порт ({value}) имеет не верный формат, пожалуйста изменить его в файле config.env и перезапустите программу");
+                                return;
+                            }
+
                             break;
                         case "AUTOLOAD":
                             autoload = value;
@@ -52,6 +61,7 @@ partial class Program
                 }
             }
 
+            Console.WriteLine(autoload);
             if (autoload == "TRUE")
             {
                 const string applicationName = "PCInfo";
@@ -62,18 +72,41 @@ partial class Program
                 {
                     registryKeyStartup.SetValue(
                         applicationName,
-                        string.Format("\"{0}\"", System.Reflection.Assembly.GetExecutingAssembly().Location.Replace("dll", "exe")));
+                        string.Format("\"{0}\"", Assembly.GetExecutingAssembly().Location));
                 }
             }
 
-            IPAddress ipAddress = IPAddress.Parse(ip);
+            IPAddress ipAddress = IPAddress.None;
+            try
+            {
+                ipAddress = IPAddress.Parse(ip);
+            }
+            catch (FormatException ex)
+            {
+                Console.WriteLine($"Используемый IP-Адрес ({ip}) имеет не верный формат, пожалуйста изменить его в файле config.env и перезапустите программу");
+                Console.ReadKey();
+                return;
+            }
+
             TcpListener server = new TcpListener(ipAddress, port);
-            server.Start();
+
+            try
+            {
+                server.Start();
+            }
+            catch (SocketException ex)
+            {
+                Console.WriteLine($"Используемый порт ({port}) занят, пожалуйста изменить его в файле config.env и перезапустите программу");
+                Console.ReadKey();
+                return;
+            }
+
 
             Console.WriteLine($"" +
                 $"Сервер запущен\n" +
                 $"Ip - {ip}\n" +
-                $"Порт - {port}");
+                $"Порт - {port}\n" +
+                "Чтобы изменить эти параметры перейдите в файл config.env");
 
             while (true)
             {
