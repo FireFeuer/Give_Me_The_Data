@@ -14,16 +14,17 @@ partial class Program
         int port = 0;
         string configFilePath = await CreateConfigFile();
 
-        Dictionary<string, string> network = await ReadConfigFile(configFilePath);
 
-        ip = network["ip"];
+
+        ip = await Give_Me_The_Data.Config.GetIPAdressAsync(configFilePath);
+        string portValue = await Give_Me_The_Data.Config.GetPortAsync(configFilePath);
         try
         {
-            port = int.Parse(network["port"]);
+            port = int.Parse(portValue);
         }
         catch
         {
-            Console.WriteLine($"Используемый порт ({network["port"]}) имеет не верный формат, пожалуйста изменить его в файле config.env и перезапустите программу");
+            Console.WriteLine($"Используемый порт ({portValue}) имеет не верный формат, пожалуйста изменить его в файле config.env и перезапустите программу");
         }
 
 
@@ -95,40 +96,7 @@ partial class Program
         return pathToEnvFile;
     }
 
-    private async static Task<Dictionary<string, string>> ReadConfigFile(string configFilePath)
-    {
-        using (var streamReader = new StreamReader(configFilePath))
-        {
-            string fileContents = await streamReader.ReadToEndAsync();
-            string[] lines = fileContents.Split('\n');
-            Dictionary<string, string> network = new Dictionary<string, string>(){
-                { "ip", "-" },
-                {"port","-" }
-            };
 
-            foreach (string line in lines)
-            {
-                string[] keyValue = line.Split('=');
-                if (keyValue.Length == 2)
-                {
-                    string key_env = keyValue[0].Trim();
-                    string value = keyValue[1].Trim();
-
-                    switch (key_env)
-                    {
-                        case "IP":
-                            network["ip"] = value;
-                            break;
-                        case "PORT":
-                            network["port"] = value;
-                            break;
-                    }
-                }
-
-            }
-            return network;
-        }
-    }
 
     private async static Task<List<Dictionary<string, string>>> GetClientData(TcpListener server)
     {
@@ -172,8 +140,10 @@ partial class Program
         string fullInfo = $"" +
                    $"{dict["name"]}\n" +
                    $"{dict["driveInfo"]}\n" +
+                   $"Температура процессора - {dict["CPUTemp"].Trim().Replace("CPU Cores:", "")}°C\n" +
                    $"Операционная система - {dict["os"]}\n" +
                    $"{dict["IsWindowsUpdateNeeded"]}\n\n" +
+                   $"{dict["driveSMART"]}\n" +
                    $"Список установленных программ\n" +
                    $"{dict["programNames"]}\n\n" +
                    $"Список ошибок системы\n" +
